@@ -5,7 +5,7 @@ import os
 TITLE = "   _____                   _     _     ___  __\n  / ____|                 (_)   | |   |__ \/_ |\n | (___  _ __   __ _ _ __  _ ___| |__    ) || |\n  \___ \| '_ \ / _` | '_ \| / __| '_ \  / / | |\n  ____) | |_) | (_| | | | | \__ \ | | |/ /_ | |\n |_____/| .__/ \__,_|_| |_|_|___/_| |_|____||_|\n        | |                                    \n        |_|          \n"
 START = "  _          _   _       ____             _       _ \n | |        | | ( )     |  _ \           (_)     | |\n | |     ___| |_|/ ___  | |_) | ___  __ _ _ _ __ | |\n | |    / _ \ __| / __| |  _ < / _ \/ _` | | '_ \| |\n | |___|  __/ |_  \__ \ | |_) |  __/ (_| | | | | |_|\n |______\___|\__| |___/ |____/ \___|\__, |_|_| |_(_)\n                                     __/ |          \n                                    |___/           "
 CARDORDERS = {"A": 0, "2": 1, "3": 2, "4": 3, "5": 4, "6": 5, "7": 6, "8": 7, "9": 8, "J": 9, "Q": 10, "K": 11}
-VALSCORES = {"A": (1, 11), "2": (2), "3": (3), "4": (4), "5": (5), "6": (6), "7": (7), "8": (8), "9": (9), "J": (10), "Q": (10), "K": (10)}
+RANKSCORES = {"A": (1, 11), "2": (2), "3": (3), "4": (4), "5": (5), "6": (6), "7": (7), "8": (8), "9": (9), "J": (10), "Q": (10), "K": (10)}
 SUITSYMBOLS = {"H": "♥", "D": "♦", "C": "♣", "S": "♠"}
 OPTIONS = ["surrender", "hit", "stand", "split", "double down", "h", "s", "x", "dd"]
 OPTIONS2 = ["hit", "stand", "split", "h", "s", "x"]
@@ -15,23 +15,23 @@ class Card:
 
     def __init__(self, s, v, h) -> None:
         self.suit = s
-        self.val = v
+        self.rank = v
         self.hidden = h
 
     def __str__(self) -> str:
         if self.hidden:
             return f"┍━━━━━━━┑\n│+++++++│\n│+++++++│\n│+++++++│\n│+++++++│\n│+++++++│\n┕━━━━━━━┙\n"
         else:
-            return f"┍━━━━━━━┑\n│{SUITSYMBOLS[self.suit]}      │\n│       │\n│   {self.val}   │\n│       │\n│      {SUITSYMBOLS[self.suit]}│\n┕━━━━━━━┙"
+            return f"┍━━━━━━━┑\n│{SUITSYMBOLS[self.suit]}      │\n│       │\n│   {self.rank}   │\n│       │\n│      {SUITSYMBOLS[self.suit]}│\n┕━━━━━━━┙"
     
     def toString(self) -> str:
         if self.hidden:
             return f"┍━━━━━━━┑\n│+++++++│\n│+++++++│\n│+++++++│\n│+++++++│\n│+++++++│\n┕━━━━━━━┙\n"
         else:
-            return f"┍━━━━━━━┑\n│{SUITSYMBOLS[self.suit]}      │\n│       │\n│   {self.val}   │\n│       │\n│      {SUITSYMBOLS[self.suit]}│\n┕━━━━━━━┙\n"
+            return f"┍━━━━━━━┑\n│{SUITSYMBOLS[self.suit]}      │\n│       │\n│   {self.rank}   │\n│       │\n│      {SUITSYMBOLS[self.suit]}│\n┕━━━━━━━┙\n"
         
     def getVal(self) -> str:
-        return self.val
+        return self.rank
     
     def hide(self):
         self.hidden = True
@@ -51,7 +51,7 @@ class Deck:
     def addpacks(self, num) -> None:
         for i in range(num):
             for s in SUITSYMBOLS.keys():
-                for v in VALSCORES.keys():
+                for v in RANKSCORES.keys():
                     self.deck.append(Card(s, v, False))
 
     def __str__(self) -> str:
@@ -186,7 +186,7 @@ class Player:
         return out
     
     def score(self) -> int:
-        cardVals = list(map(lambda x: VALSCORES[x.getVal()], self.hand))
+        cardVals = list(map(lambda x: RANKSCORES[x.getVal()], self.hand))
         possHands = [cardVals]
 
         while any((1,11) in sl for sl in possHands):
@@ -218,7 +218,7 @@ class Player:
         return highest
     
     def showing(self) -> int:
-        cardVals = list(map(lambda x: VALSCORES[x.getVal()] if not x.isHidden() else 0, self.hand))
+        cardVals = list(map(lambda x: RANKSCORES[x.getVal()] if not x.isHidden() else 0, self.hand))
         possHands = [cardVals]
 
         while any((1,11) in sl for sl in possHands):
@@ -256,7 +256,7 @@ def split(p: Player, d: Deck) -> bool:
     
     pHand = p.getHand()
     canSplit = []
-    for t in VALSCORES.keys():
+    for t in RANKSCORES.keys():
         if list(map(lambda x: x.getVal(), pHand)).count(t) >= 2:
             canSplit.append(t)
     if len(canSplit) == 0:
@@ -266,7 +266,8 @@ def split(p: Player, d: Deck) -> bool:
         pick = input("Pick Which Card Rank To Split")
         if pick.lower() not in canSplit:
             print("Invalid Selection!")
-            return False
+            continue
+        splitOp = pick
     
     for i in range(len(pHand)):
         if pHand[i].getVal == pick:
@@ -281,17 +282,18 @@ def shSplit(sh: Player, p: Player, d: Deck) -> bool:
     
     shHand = sh.getHand()
     canSplit = []
-    for t in VALSCORES.keys():
+    for t in RANKSCORES.keys():
         if list(map(lambda x: x.getVal(), shHand)).count(t) >= 2:
             canSplit.append(t)
     if len(canSplit) == 0:
         print("Can't Split!")
     splitOp = ""
     while splitOp == "":
-        pick = input("Pick Which Card Rank To Split")
+        pick = input("Pick Which Card Rank To Split: ")
         if pick.lower() not in canSplit:
             print("Invalid Selection!")
-            return False
+            continue
+        splitOp = pick
     
     for i in range(len(shHand)):
         if shHand[i].getVal == pick:
