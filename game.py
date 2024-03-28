@@ -6,9 +6,10 @@ TITLE = "   _____                   _     _     ___  __\n  / ____|              
 START = "  _          _   _       ____             _       _ \n | |        | | ( )     |  _ \           (_)     | |\n | |     ___| |_|/ ___  | |_) | ___  __ _ _ _ __ | |\n | |    / _ \ __| / __| |  _ < / _ \/ _` | | '_ \| |\n | |___|  __/ |_  \__ \ | |_) |  __/ (_| | | | | |_|\n |______\___|\__| |___/ |____/ \___|\__, |_|_| |_(_)\n                                     __/ |          \n                                    |___/           "
 CARDORDERS = {"A": 0, "2": 1, "3": 2, "4": 3, "5": 4, "6": 5, "7": 6, "8": 7, "9": 8, "J": 9, "Q": 10, "K": 11}
 RANKSCORES = {"A": (1, 11), "2": (2), "3": (3), "4": (4), "5": (5), "6": (6), "7": (7), "8": (8), "9": (9), "J": (10), "Q": (10), "K": (10)}
+RIGGED = {"A": (1, 11), "A": (1, 11), "A": (1, 11), "A": (1, 11), "A": (1, 11), "A": (1, 11), "A": (1, 11), "A": (1, 11), "A": (1, 11), "A": (1, 11), "A": (1, 11), "A": (1, 11), "A": (1, 11)}
 SUITSYMBOLS = {"H": "♥", "D": "♦", "C": "♣", "S": "♠"}
 OPTIONS = ["surrender", "hit", "stand", "split", "double down", "h", "s", "x", "dd"]
-OPTIONS2 = ["hit", "stand", "split", "h", "s", "x"]
+OPTIONS2 = ["hit", "stand", "h", "s"]
 
 
 class Card:
@@ -78,7 +79,14 @@ class Deck:
         print(Deck.prettyString(self.deck))
 
     def getRandom(self) -> Card:
-        return self.deck.pop(random.randint(0, len(self.deck) - 1))
+        try:
+            card = self.deck.pop(random.randrange(len(self.deck)))
+            return card
+        except:
+            self.addpacks(1)
+            card = self.deck.pop(random.randrange(len(self.deck)))
+            return card
+        
     
     def returnCards(self, cs: list) -> None:
         for c in cs:
@@ -95,6 +103,15 @@ class Player:
         self.play = True
         self.chips = 0
         self.bet = 0
+        self.subHand = False
+        self.parent = None
+
+    def setParent(self, p) -> None:
+        self.parent = p
+        self.subHand = True
+
+    def isSubHand(self) -> bool:
+        return self.subHand
 
     def getHand(self):
         return self.hand
@@ -103,7 +120,7 @@ class Player:
         return self.name
     
     def canPlay(self) -> bool:
-        if self.chips == 0:
+        if self.getChips == 0 or self.score() == -1:
             return False
         return self.play
     
@@ -116,13 +133,12 @@ class Player:
     def surrender(self) -> None:
         self.play = False
         self.surrendered = True
-        self.chips += self.bet//2
-        self.bet = 0
 
     def reset(self) -> None:
         for sh in self.splitHands:
             self.addChips(sh.getChips())
             sh.setChips(0)
+        self.splitHands = []
         self.play = True
         self.busted = False
         self.surrendered = False
@@ -132,12 +148,16 @@ class Player:
         self.chips += c
 
     def removeChips(self, c: int) -> None:
+        if self.subHand:
+            self.parent.chips -= c
         self.chips -= c
 
     def setChips(self, c: int) -> None:
         self.chips = c
 
     def getChips(self) -> int:
+        if self.subHand:
+            return self.parent.getChips()
         return self.chips
 
     def addBet(self, b: int) -> bool:
@@ -154,14 +174,25 @@ class Player:
     def setBet(self, b: int) -> None:
         self.bet = b
     
-    def addSplit(self, b: int, sc: Card, nhc: Card, npc: Card):
-        
-        newHand = Player(self.name + f"{len(self.splitHands)+2}")
+    def addSplitHand(self, p, b: int, sc: Card, nhc: Card, npc: Card):
+        newHand = Player(self.name + f" Hand {len(self.splitHands)+2}")
+        newHand.setParent(p)
         newHand.addcard(sc)
         newHand.setBet(b)
         self.removeChips(b)
         self.addcard(npc)
         newHand.addcard(nhc)
+        self.splitHands.append(newHand)
+    
+    def nestSplit(self, p, b:int, sc: Card, nhc: Card, npc: Card):
+        newHand = Player(self.parent.name + f" Hand {len(self.parent.splitHands)+2}")
+        newHand.setParent(p)
+        newHand.addcard(sc)
+        newHand.setBet(b)
+        self.parent.removeChips(b)
+        self.addcard(npc)
+        newHand.addcard(nhc)
+        self.parent.splitHands.append(newHand)
 
     def isBusted(self) -> bool:
         return self.busted
@@ -261,22 +292,13 @@ def split(p: Player, d: Deck) -> bool:
             canSplit.append(t)
     if len(canSplit) == 0:
         print("Can't Split!")
-    splitOp = ""
-    while splitOp == "":
-        pick = input("Pick Which Card Rank To Split")
-        if pick.lower() not in canSplit:
-            print("Invalid Selection!")
-            continue
-        splitOp = pick
+        return False
     
-    for i in range(len(pHand)):
-        if pHand[i].getVal == pick:
-            p.addSplitHand(p.getBet(), pHand.pop(i), d.getRandom(), d.getRandom())
-            print(f"Split {pick}'s")
+    p.addSplitHand(p, p.getBet(), pHand.pop(0), d.getRandom(), d.getRandom())
     return True
 
 def shSplit(sh: Player, p: Player, d: Deck) -> bool:
-    if p.getChips() < p.getBet():
+    if sh.getChips() < sh.getBet():
         print("Not Enough Chips To Split!")
         return False
     
@@ -287,18 +309,9 @@ def shSplit(sh: Player, p: Player, d: Deck) -> bool:
             canSplit.append(t)
     if len(canSplit) == 0:
         print("Can't Split!")
-    splitOp = ""
-    while splitOp == "":
-        pick = input("Pick Which Card Rank To Split: ")
-        if pick.lower() not in canSplit:
-            print("Invalid Selection!")
-            continue
-        splitOp = pick
+        return False
     
-    for i in range(len(shHand)):
-        if shHand[i].getVal == pick:
-            p.addSplitHand(p.getBet(), shHand.pop(i), d.getRandom(), d.getRandom())
-            print(f"Split {pick}'s")
+    sh.nestSplit(p, sh.getBet(), shHand.pop(0), d.getRandom(), d.getRandom())
     return True
     
 def main():
@@ -409,7 +422,7 @@ def main():
                             option = select
                             print("\n")
                         else:
-                            select = input("Hit, Stand, Split\n?: ")
+                            select = input("Hit, Stand\n?: ")
                             if select.lower() not in OPTIONS2:
                                 print("Invalid Selection!")
                                 continue
@@ -437,9 +450,11 @@ def main():
                         case "split":
                             if not split(p, d):
                                 continue
+                            initialRound = False
                         case "x":
                             if not split(p, d):
                                 continue
+                            initialRound = False
                             
                         case "double down":
                             if not p.addBet(p.getBet()):
@@ -472,7 +487,7 @@ def main():
 
                         print(f"{sh.getName()}'s Turn...")
 
-                        pscore = str(sh.score()) if sh.score() > 0 else "BUST!"
+                        shscore = str(sh.score()) if sh.score() > 0 else "BUST!"
                         print(f"{sh.getName()}'s Hand: {shscore}" )
                         print(Deck.prettyString(sh.getHand()))
 
@@ -489,7 +504,7 @@ def main():
                                 option = select
                                 print("\n")
                             else:
-                                select = input("Hit, Stand, Split\n?: ")
+                                select = input("Hit, Stand\n?: ")
                                 if select.lower() not in OPTIONS2:
                                     print("Invalid Selection!")
                                     continue
@@ -517,9 +532,11 @@ def main():
                             case "split":
                                 if not shSplit(sh, p, d):
                                     continue
+                                initialRound = False
                             case "x":
                                 if not shSplit(sh, p, d):
                                     continue
+                                initialRound = False
                                 
                             case "double down":                                
                                 if sh.getBet() <= p.getChips:
@@ -552,7 +569,7 @@ def main():
             for p in players:
                 allPlayers += p.getSplitHands()
 
-            if any(list(map(lambda x: x.score() != -1, allPlayers))):
+            if any(list(map(lambda x: x.canPlay(), allPlayers))):
                 while dealer.score() < 17 and dealer.score() != -1:
                     time.sleep(1)
                     os.system('cls')
@@ -570,6 +587,10 @@ def main():
             for i in range(len(allPlayers)):
                 pl = allPlayers[i]
                 chipsWon = 0
+                if pl.isSurrendered():
+                    chipsWon -= pl.getBet()//2
+                    pl.removeChips(pl.getBet()-chipsWon)
+
                 if pl.score() != -1:
                     if pl.score() == dealer.score():
                         pl.addChips(pl.getBet())
@@ -581,7 +602,10 @@ def main():
                 else:
                     chipsWon -= pl.getBet()
                 score = pl.score() if pl.score() > 0 else "BUST!"
-                print(f"{pl.getName()} : {score} | Round +/- {chipsWon} | Total: ${pl.getChips()}")
+                if pl.isSubHand():
+                    print(f"{pl.getName():>15} : {score} | Round +/- {chipsWon}")
+                else:
+                    print(f"{pl.getName():>15} : {score} | Round +/- {chipsWon} | Total: ${pl.getChips()}")
 
 
             input("\nEnter To Continue...")
