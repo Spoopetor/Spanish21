@@ -584,6 +584,8 @@ def main():
 
             input("\nEnter To Continue...")
 
+            d.returnCards(dealer.removecards())
+            dealer.reset()
             for p in players:
                 d.returnCards(p.removecards())
                 p.reset()
