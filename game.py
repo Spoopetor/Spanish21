@@ -1,4 +1,5 @@
 import random
+import sys
 import time
 import os
 
@@ -10,6 +11,7 @@ RIGGED = {"A": (1, 11), "A": (1, 11), "A": (1, 11), "A": (1, 11), "A": (1, 11), 
 SUITSYMBOLS = {"H": "♥", "D": "♦", "C": "♣", "S": "♠"}
 OPTIONS = ["surrender", "hit", "stand", "split", "double down", "h", "s", "x", "dd"]
 OPTIONS2 = ["hit", "stand", "h", "s"]
+YN = ["y", "n"]
 
 
 class Card:
@@ -366,8 +368,35 @@ def main():
         while True:
             dealer.addcard(d.getRandom())
             dealer.addcard(d.getRandom().hide())
+
+            if len(players) == 0:
+                print("No Players Remaining!")
+                sys.exit(0)
             
             for p in players:
+                if p.getChips() == 0:
+                    select = ""
+                    while select == "":
+                        choice = input("Buy Back In? (Y/N): ")
+                        if choice.lower() not in YN:
+                            print("Invalid Selection!")
+                            continue
+                        break
+                    if choice =="N":
+                        players.remove(p)
+                        continue
+                    while cashin == -1:
+                        num = input("Cash in: $")
+                        try:
+                            inNum = int(num)
+                            if inNum <=0:
+                                print("Invalid Selection!")
+                                continue
+                            cashin = inNum
+                        except:
+                            print("Invalid Selection!")
+                    p.addChips(cashin)
+
                 pBet = -1
 
                 while pBet == -1:
@@ -539,7 +568,7 @@ def main():
                                 initialRound = False
                                 
                             case "double down":                                
-                                if sh.getBet() <= p.getChips:
+                                if sh.getBet() <= p.getChips():
                                     print("Can't Double Down!")
                                     continue
                                 p.removeChips(p.getBet())
@@ -548,7 +577,7 @@ def main():
                                 sh.addcard(d.getRandom())
 
                             case "dd":
-                                if sh.getBet() <= p.getChips:
+                                if sh.getBet() <= p.getChips():
                                     print("Can't Double Down!")
                                     continue
                                 p.removeChips(p.getBet())
@@ -564,7 +593,8 @@ def main():
             print(Deck.prettyString(dealer.getHand())+"\n")
             time.sleep(.5)
 
-            allPlayers = players
+            allPlayers = []
+            allPlayers += players
 
             for p in players:
                 allPlayers += p.getSplitHands()
